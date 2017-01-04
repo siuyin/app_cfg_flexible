@@ -1,0 +1,92 @@
+---
+# AppA Manager sample (fake) configuration.
+# Author: date.
+# Manager will be configured below to responsd to
+#  FileStable events
+#  FileMover output / response events
+#  Emailer output events
+#
+# Note on & and *s:
+# &fmBoard is an anchor, refer to it as *fmBoard.
+FileWatchersCfg:
+  Board: FileStableA
+  subscribe: true
+  Dirs:
+  - Dir: Turner
+    Output:
+    - Board: &fmBoard FileMoversA # &fmBoard is an anchor, refer to it as *fmBoard. *fmBoard has a value of FileMoversA.
+      ID: &fmReq FileMoveReq
+      Op: Move
+      Data:
+        Src: "{{ src }}"
+        Tgt: XCodeA
+    - Board: MediaRegistrationsA
+      ID: &mrReq MediaRegReq
+      Op: New
+      Data:
+        Fn: "{{ src }}"
+        Cust: "{{ Dir }}"
+        Stage: Initial Input
+  - Dir: Diva
+    Output:
+    - Board: *fmBoard
+      ID: *fmReq
+      Op: Move
+      Data:
+        Src: "{{ src }}"
+        Tgt: XCodeB
+    - Board: MediaRegistrationsA
+      ID: *mrReq
+      Op: New
+      Data:
+        Fn: "{{ src }}"
+        Cust: "{{ Dir }}"
+        Stage: Initial Input
+
+FileMoversCfg:
+  Board: *fmBoard
+  subscribe: false
+
+FileMoversOutCfg:
+  Board: &fmOBoard FileMoversAOut
+  subscribe: true
+  Status:
+    OK:
+      Output:
+      - Board: &lBd Logging
+        ID: &lRq LogReq
+        Op: Log
+        Data:
+          Msg: "{{ FileMoveOp }} from {{ Src }} to {{ Dest }} succeeded."
+    Fail:
+      Output:
+      - Board: *lBd
+        ID: *lRq
+        Op: Log
+        Data:
+          Msg: "{{ FileMoveOp }} from {{ Src }} to {{ Dest }} Failed."
+      - Board: FileMoversA
+        ID: FileMoveRetry
+        Op: Copy
+        Data:
+          Src: "{{ Src }}"
+          Tgt: "{{ Tgt }}"
+          Times: 5
+          Strategy: ExponentialBackoff
+
+# The EmailerCfg below uses yaml default lowercase.
+emailerscfg:
+  board: EmailersA
+  subscribe: false
+
+emailersoutcfg:
+  board: EmailersAOut
+  subscribe: true
+  status:
+    ok:
+      output:
+      - Board: *lBd
+        ID: *lRq
+        Op: Log
+        Data:
+          Msg: Email {{ EmailDetails }} sucessfully sent
